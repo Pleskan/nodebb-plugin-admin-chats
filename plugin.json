@@ -1,19 +1,64 @@
 {
-    "id": "nodebb-plugin-admin-chats",
-    "name": "Super Admin Chat Control",
-    "description": "A plugin that allows the administrator to view and manage user chats",
-    "url": "https://github.com/palmoni5/nodebb-plugin-admin-chats",
-    "library": "./library.js",
-    "scripts": [ "client.js" ],
-    "hooks": [
-        { "hook": "filter:user.accountMenu", "method": "addProfileLink" },
-        { "hook": "filter:messaging.isRoomOwner", "method": "isRoomOwner" },
-        { "hook": "filter:messaging.isUserInRoom", "method": "isUserInRoom" },
-        { "hook": "filter:messaging.canReply", "method": "canReply" },
-        { "hook": "filter:messaging.canGetMessages", "method": "canGetMessages" },
-        { "hook": "filter:messaging.canGetRecentChats", "method": "canGetRecentChats" },
-        { "hook": "filter:messaging.canGetPublicChats", "method": "canGetPublicChats" },
-        { "hook": "filter:messaging.loadRoom", "method": "onLoadRoom" },
-        { "hook": "static:app.load", "method": "init" }
-    ]
+  "id": "nodebb-plugin-admin-chats",
+  "name": "Super Admin Chat Control",
+  "description": "A plugin that allows the administrator to view and manage user chats",
+  "url": "https://github.com/palmoni5/nodebb-plugin-admin-chats",
+  "library": "./library.js",
+  "scripts": [
+    "client.js"
+  ],
+  "hooks": [
+    {
+      "hook": "filter:user.accountMenu",
+      "method": "addProfileLink"
+    },
+    {
+      "hook": "filter:messaging.isRoomOwner",
+      "method": "isRoomOwner"
+    },
+    {
+      "hook": "filter:messaging.isUserInRoom",
+      "method": "isUserInRoom"
+    },
+    {
+      "hook": "filter:messaging.canReply",
+      "method": "canReply"
+    },
+    {
+      "hook": "filter:messaging.canGetMessages",
+      "method": "canGetMessages"
+    },
+    {
+      "hook": "filter:messaging.canGetRecentChats",
+      "method": "canGetRecentChats"
+    },
+    {
+      "hook": "filter:messaging.canGetPublicChats",
+      "method": "canGetPublicChats"
+    },
+    {
+      "hook": "filter:messaging.loadRoom",
+      "method": "onLoadRoom"
+    },
+    {
+      "hook": "filter:messaging.send",
+      "method": "filterMessagingSend"
+    },
+    {
+      "hook": "static:app.load",
+      "method": "init"
+    },
+    {
+      "hook": "filter:messaging.addUsersToRoom",
+      "method": "filterAddUsersToRoom"
+    },
+    {
+      "hook": "filter:messaging.removeUsersFromRoom",
+      "method": "filterRemoveUsersFromRoom"
+    },
+    {
+      "hook": "filter:chat.renameRoom",
+      "method": "filterRenameRoom"
+    }
+  ]
 }

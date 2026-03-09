@@ -2,16 +2,17 @@
 
 const User = require.main.require('./src/user');
 const Messaging = require.main.require('./src/messaging');
+const ChatsAPI = require.main.require('./src/api/chats');
 const db = require.main.require('./src/database');
 
 const plugin = {};
 const LOCK_PREFIX = '[admin-chat-lock]';
 const LOCKED_MESSAGE_TEXT = '🔒 חדר זה ננעל ע"י המנהלים.';
-const UNLOCKED_MESSAGE_TEXT = '🔓 חדר זה נפתח מחדש ע"י המנהלים.';
 
 plugin.init = async function (params) {
     registerRoutes(params.router, params.middleware);
     overrideMessagingFunctions();
+    overrideChatsApi();
 };
 
 plugin.addProfileLink = async function (data) {
@@ -72,6 +73,45 @@ plugin.canReply = async function (payload) {
     return payload;
 };
 
+plugin.filterMessagingSend = async function (payload) {
+    const uid = getCallerUid(payload);
+    const roomId = getRoomId(payload);
+
+    if (!uid || !roomId) {
+        return payload;
+    }
+
+    if (await User.isAdministrator(uid)) {
+        return payload;
+    }
+
+    if (await isRoomLocked(roomId)) {
+        throw new Error('[[error:not-allowed]]');
+    }
+
+    return payload;
+};
+plugin.filterAddUsersToRoom = async function (payload) {
+    if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
+        payload.inRoom = false;
+    }
+    return payload;
+};
+
+plugin.filterRemoveUsersFromRoom = async function (payload) {
+    if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
+        payload.isOwner = false;
+    }
+    return payload;
+};
+
+plugin.filterRenameRoom = async function (payload) {
+    if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
+        throw new Error('[[error:no-privileges]]');
+    }
+    return payload;
+};
+
 plugin.canGetMessages = async function (payload) {
     const isAdmin = await User.isAdministrator(payload.callerUid);
     if (isAdmin) {
@@ -104,11 +144,12 @@ plugin.onLoadRoom = async function (payload) {
 
     const isAdmin = await User.isAdministrator(uid);
     const lockData = await getRoomLockData(room.roomId);
-    room.adminChatLock = lockData;
+    const isLockedForUser = lockData.isLocked && !isAdmin;
 
-    if (lockData.isLocked) {
-        room.messages = appendLockNotice(room.messages, lockData);
-    }
+    room.adminChatLock = lockData;
+    room.messages = buildRoomMessagesWithLockNotice(room.messages, lockData);
+    room.canReply = room.canReply && !isLockedForUser;
+    room.showUserInput = room.showUserInput && !isLockedForUser;
 
     if (!isAdmin) {
         return payload;
@@ -138,7 +179,7 @@ plugin.onLoadRoom = async function (payload) {
                 msg.index = count - index - 1;
             });
 
-            room.messages = appendLockNotice(messages.reverse(), lockData);
+            room.messages = buildRoomMessagesWithLockNotice(messages.reverse(), lockData);
 
             room.messages.forEach((msg, index) => {
                 if (index === 0) {
@@ -158,6 +199,23 @@ plugin.onLoadRoom = async function (payload) {
     return payload;
 };
 
+function overrideChatsApi() {
+    if (!ChatsAPI || typeof ChatsAPI.kick !== 'function' || ChatsAPI.kick._adminChatLockWrapped) {
+        return;
+    }
+
+    const originalKick = ChatsAPI.kick;
+    const wrappedKick = async function (caller, data) {
+        if (caller && !await User.isAdministrator(caller.uid) && data && data.roomId && Array.isArray(data.uids) && data.uids.length === 1 && parseInt(data.uids[0], 10) === parseInt(caller.uid, 10) && await isRoomLocked(data.roomId)) {
+            throw new Error('[[error:not-allowed]]');
+        }
+
+        return await originalKick.call(this, caller, data);
+    };
+
+    wrappedKick._adminChatLockWrapped = true;
+    ChatsAPI.kick = wrappedKick;
+}
 function overrideMessagingFunctions() {
     const originalCanEdit = Messaging.canEdit;
     const originalCanDelete = Messaging.canDelete;
@@ -168,6 +226,12 @@ function overrideMessagingFunctions() {
         if (await User.isAdministrator(uid)) {
             return true;
         }
+
+        const roomId = await getMessageRoomId(messageId);
+        if (roomId && await isRoomLocked(roomId)) {
+            throw new Error('[[error:cant-edit-chat-message]]');
+        }
+
         return await originalCanEdit(messageId, uid);
     };
 
@@ -175,6 +239,12 @@ function overrideMessagingFunctions() {
         if (await User.isAdministrator(uid)) {
             return true;
         }
+
+        const roomId = await getMessageRoomId(messageId);
+        if (roomId && await isRoomLocked(roomId)) {
+            throw new Error('[[error:cant-delete-chat-message]]');
+        }
+
         return await originalCanDelete(messageId, uid);
     };
 
@@ -197,7 +267,7 @@ function overrideMessagingFunctions() {
             return await originalCanReply.apply(this, args);
         };
     }
-};
+}
 
 function registerRoutes(router, middleware) {
     if (!router) {
@@ -243,6 +313,17 @@ function registerRoutes(router, middleware) {
     });
 }
 
+async function canNonAdminModifyLockedRoom(uid, roomId) {
+    if (!uid || !roomId) {
+        return false;
+    }
+
+    if (await User.isAdministrator(uid)) {
+        return false;
+    }
+
+    return await isRoomLocked(roomId);
+}
 async function roomExists(roomId) {
     const roomData = await db.getObject(`chat:room:${roomId}`);
     return !!roomData;
@@ -256,7 +337,6 @@ async function lockRoom(roomId, actingUid) {
         lockedAt: now,
     });
 
-    await addLockSystemMessage(roomId, actingUid, true);
     return await getRoomLockData(roomId);
 }
 
@@ -267,27 +347,17 @@ async function unlockRoom(roomId, actingUid) {
         lockedAt: 0,
     });
 
-    await addLockSystemMessage(roomId, actingUid, false);
     return await getRoomLockData(roomId);
-}
-
-async function addLockSystemMessage(roomId, actingUid, isLocked) {
-    if (typeof Messaging.addSystemMessage !== 'function') {
-        return;
-    }
-
-    const messageText = isLocked ? LOCK_PREFIX + ' ' + LOCKED_MESSAGE_TEXT : LOCK_PREFIX + ' ' + UNLOCKED_MESSAGE_TEXT;
-
-    try {
-        await Messaging.addSystemMessage(messageText, actingUid, roomId);
-    } catch (err) {
-        console.error('[Super Admin Chats] Error adding lock system message:', err);
-    }
 }
 
 async function isRoomLocked(roomId) {
     const field = await db.getObjectField(`chat:room:${roomId}:adminLock`, 'isLocked');
     return field === '1' || field === 1 || field === true;
+}
+
+async function getMessageRoomId(messageId) {
+    const roomId = await db.getObjectField(`message:${messageId}`, 'roomId');
+    return parseInt(roomId, 10) || 0;
 }
 
 async function getRoomLockData(roomId) {
@@ -303,20 +373,14 @@ async function getRoomLockData(roomId) {
     };
 }
 
-function appendLockNotice(messages, lockData) {
-    const list = Array.isArray(messages) ? messages.slice() : [];
+function buildRoomMessagesWithLockNotice(messages, lockData) {
+    const cleanedMessages = stripAdminLockMessages(messages);
     if (!lockData || !lockData.isLocked || !lockData.lockedAt) {
-        return list;
+        return cleanedMessages;
     }
 
-    const content = `${LOCK_PREFIX} ${LOCKED_MESSAGE_TEXT}`;
-    const exists = list.some(msg => msg && msg.content === content);
-    if (exists) {
-        return list;
-    }
-
-    list.push({
-        content,
+    cleanedMessages.push({
+        content: `${LOCK_PREFIX} ${LOCKED_MESSAGE_TEXT}`,
         fromuid: lockData.lockedBy,
         uid: lockData.lockedBy,
         timestamp: lockData.lockedAt,
@@ -325,13 +389,26 @@ function appendLockNotice(messages, lockData) {
         newSet: true,
     });
 
-    list.sort((left, right) => {
+    cleanedMessages.sort((left, right) => {
         const leftTime = parseInt(left && (left.timestamp || left.datetime), 10) || 0;
         const rightTime = parseInt(right && (right.timestamp || right.datetime), 10) || 0;
         return leftTime - rightTime;
     });
 
-    return list;
+    return cleanedMessages;
+}
+
+function stripAdminLockMessages(messages) {
+    const list = Array.isArray(messages) ? messages.slice() : [];
+    return list.filter(msg => !isAdminLockMessage(msg));
+}
+
+function isAdminLockMessage(msg) {
+    const content = String(msg && msg.content || '');
+    return content.includes('admin-chat-lock') ||
+        content.includes(LOCKED_MESSAGE_TEXT) ||
+        content.includes('נפתח מחדש ע"י המנהלים') ||
+        content.includes('modules:chat.system.[admin-chat-lock]');
 }
 
 function guessRoomIdUidFromArgs(args) {
@@ -370,3 +447,4 @@ function getRoomId(payload) {
 }
 
 module.exports = plugin;
+

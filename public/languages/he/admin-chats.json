@@ -1,0 +1,8 @@
+{
+  "lock.banner": "🔒 חדר זה ננעל ע\"י המנהלים.",
+  "menu.lock": "נעילת חדר",
+  "menu.release": "שיחרור נעילה",
+  "errors.update": "לא ניתן לעדכן את נעילת החדר.",
+  "profile.viewChats": "צפיה בצ'אטים",
+  "empty.selectChat": "אנא בחר צ'אט מסרגל הצד."
+}

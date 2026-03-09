@@ -1,9 +1,31 @@
 $(document).ready(function() {
     const LOCK_PREFIX = '[admin-chat-lock]';
-    const LOCKED_MESSAGE_TEXT = '🔒 חדר זה ננעל ע"י המנהלים.';
+    const TEXT = {
+        he: {
+            lockBanner: '🔒 חדר זה ננעל ע"י המנהלים.',
+            menuLock: 'נעל חדר',
+            menuRelease: 'שחרר נעילה',
+            updateError: 'לא ניתן לעדכן את נעילת החדר.',
+            viewChats: "צפיה בצ'אטים",
+            emptyState: "אנא בחר צ'אט מסרגל הצד.",
+        },
+        en: {
+            lockBanner: '🔒 This room was locked by the administrators.',
+            menuLock: 'Lock Room',
+            menuRelease: 'Release Lock',
+            updateError: 'Unable to update room lock.',
+            viewChats: 'View Chats',
+            emptyState: 'Please select a chat from the sidebar.',
+        },
+    };
 
     function isEnglishSystem() {
         return $('html').attr('lang') && $('html').attr('lang').startsWith('en');
+    }
+
+    function t(key) {
+        const dict = isEnglishSystem() ? TEXT.en : TEXT.he;
+        return dict[key];
     }
 
     function replaceAdminEmptyStateText() {
@@ -11,14 +33,13 @@ $(document).ready(function() {
 
         $('span.text-muted.text-sm').each(function() {
             const currentText = $(this).text().trim();
-
-            if (currentText.includes("אין לכם צ'אטים פעילים") || currentText === "אין לכם צ'אטים פעילים.") {
-                $(this).text("אנא בחר צ'אט מסרגל הצד.");
-                $(this).removeClass('text-muted');
-            }
-
-            if (currentText.includes('You have no active chats') || currentText === 'You have no active chats.') {
-                $(this).text('Please select a chat from the sidebar.');
+            if (
+                currentText.includes("אין לכם צ'אטים פעילים") ||
+                currentText === "אין לכם צ'אטים פעילים." ||
+                currentText.includes('You have no active chats') ||
+                currentText === 'You have no active chats.'
+            ) {
+                $(this).text(t('emptyState'));
                 $(this).removeClass('text-muted');
             }
         });
@@ -32,20 +53,15 @@ $(document).ready(function() {
         return ajaxify.data.room || ajaxify.data;
     }
 
-    function getLockText() {
-        if (isEnglishSystem()) {
-            return '🔒 This room was locked by the administrators.';
-        }
-
-        return LOCKED_MESSAGE_TEXT;
+    function isLockedForCurrentUser() {
+        const roomData = getRoomData();
+        return !!(roomData && roomData.adminChatLock && roomData.adminChatLock.isLocked && !(app.user && app.user.isAdmin));
     }
 
     function renderLockBanner() {
-        const roomData = getRoomData();
-        const lockData = roomData && roomData.adminChatLock;
         $('.admin-chat-lock-banner').remove();
 
-        if (!lockData || !lockData.isLocked) {
+        if (!isLockedForCurrentUser()) {
             return;
         }
 
@@ -54,70 +70,74 @@ $(document).ready(function() {
             return;
         }
 
-        target.prepend(`
-            <div class="admin-chat-lock-banner alert alert-warning mb-2">${getLockText()}</div>
-        `);
+        const positionStyle = isEnglishSystem() ? 'float:right; clear:both;' : 'float:left; clear:both;';
+        target.prepend(`<div class="admin-chat-lock-banner alert alert-warning mb-2 text-start" style="${positionStyle} max-width: fit-content;">${t('lockBanner')}</div>`);
     }
 
-    function setComposerVisibility(shouldHide) {
-        const selectors = [
+    function setComposerHidden(hidden) {
+        [
             '[component="chat/composer"]',
-            '[component="chat/replies"]',
-            '[component="chat/input"]',
-            '[component="chat/textarea"]',
-            '.chat-input',
-            '.composer',
-        ];
-
-        const seen = new Set();
-        selectors.forEach(function(selector) {
+            '[component="chat/message/window"] [component="chat/composer"]',
+            '[component="chat/main-wrapper"] [component="chat/composer"]',
+            '.expanded-chat [component="chat/composer"]',
+        ].forEach(function(selector) {
             $(selector).each(function() {
-                const $element = $(this);
-                const $container = $element.closest('[component="chat/composer"], [component="chat/replies"], .chat-input, .composer').length ?
-                    $element.closest('[component="chat/composer"], [component="chat/replies"], .chat-input, .composer').first() :
-                    $element;
-                const domNode = $container.get(0);
-
-                if (!domNode || seen.has(domNode)) {
-                    return;
+                const $composer = $(this);
+                if (hidden) {
+                    $composer.addClass('hidden').hide();
+                } else {
+                    $composer.removeClass('hidden').show();
                 }
-
-                seen.add(domNode);
-                $container.toggle(!shouldHide);
             });
         });
+
+        $('[component="chat/input"], [component="chat/send"], button[data-action="send"], textarea.chat-input')
+            .prop('disabled', hidden)
+            .attr('disabled', hidden ? 'disabled' : null);
     }
 
-    function updateComposerState() {
-        const roomData = getRoomData();
-        const lockData = roomData && roomData.adminChatLock;
-        const shouldHideComposer = !!(lockData && lockData.isLocked && !(app.user && app.user.isAdmin));
+    function updateComposerVisibility() {
+        setComposerHidden(isLockedForCurrentUser());
+    }
 
-        $('[component="chat/input"], [component="chat/textarea"], textarea.chat-input, .chat-input textarea')
-            .prop('disabled', shouldHideComposer)
-            .attr('placeholder', shouldHideComposer ? getLockText() : null);
+    function updateLockedActionVisibility() {
+        const hidden = isLockedForCurrentUser();
 
-        $('[component="chat/send"], .chat-send, button[component="chat/submit"]').prop('disabled', shouldHideComposer);
+        [
+            '[data-action="reply"]',
+            '[data-action="edit"]',
+            '[data-action="delete"]',
+            '[data-action="restore"]',
+            '[data-action="kick"]',
+            '[data-action="toggleOwner"]'
+        ].forEach(function(selector) {
+            $(selector).toggleClass('hidden', hidden).toggle(!hidden);
+        });
 
-        setComposerVisibility(shouldHideComposer);
-        renderLockBanner();
+        $('[component="chat/controlsToggle"]').closest('.dropdown').toggleClass('hidden', hidden).toggle(!hidden);
+        $('[component="chat/manage/user/add/search"], [component="chat/manage/user/list/search"], [component="chat/manage/save"]')
+            .toggleClass('hidden', hidden)
+            .toggle(!hidden)
+            .prop('disabled', hidden)
+            .attr('disabled', hidden ? 'disabled' : null);
+        $('[component="chat/manage-modal"] .form-text, [component="chat/manage-modal"] .text-danger')
+            .toggleClass('hidden', hidden);
     }
 
     function normalizeLockMessages() {
-        $('[component="chat/message/content"], .chat-message-content').each(function() {
+        $('[component="chat/system-message"] > div').each(function() {
             const $el = $(this);
             const text = $el.text().trim();
-            if (!text.startsWith(LOCK_PREFIX)) {
+            if (!text.includes('admin-chat-lock')) {
                 return;
             }
 
-            $el.text(text.replace(LOCK_PREFIX, '').trim());
+            $el.text(t('lockBanner'));
         });
     }
 
     function getRoomMenuTargets() {
-        return $('[component="chat/header"], .chat-header, [component="chat/nav"]')
-            .find('.dropdown-menu');
+        return $('[component="chat/header"], .chat-header, [component="chat/nav"]').find('.dropdown-menu');
     }
 
     function renderAdminLockControl() {
@@ -140,7 +160,7 @@ $(document).ready(function() {
 
         const lockData = roomData.adminChatLock || {};
         const isLocked = !!lockData.isLocked;
-        const itemText = isEnglishSystem() ? (isLocked ? 'Unlock Room' : 'Lock Room') : (isLocked ? 'פתח חדר' : 'נעל חדר');
+        const itemText = isLocked ? t('menuRelease') : t('menuLock');
         const iconClass = isLocked ? 'fa-lock-open' : 'fa-lock';
         const menuItemHtml = `
             <li role="presentation" class="admin-chat-lock-item-wrap">
@@ -182,7 +202,9 @@ $(document).ready(function() {
     function refreshChatUi() {
         replaceAdminEmptyStateText();
         renderAdminLockControl();
-        updateComposerState();
+        updateComposerVisibility();
+        updateLockedActionVisibility();
+        renderLockBanner();
         normalizeLockMessages();
     }
 
@@ -193,14 +215,12 @@ $(document).ready(function() {
             const userSlug = ajaxify.data.userslug || (ajaxify.data.user && ajaxify.data.user.userslug);
 
             if (userSlug) {
-                const buttonText = isEnglishSystem() ? 'View Chats' : "צפיה בצ'אטים";
                 const relativePath = config.relative_path || '';
-
                 const btnHtml = `
                     <li role="presentation">
                         <a class="dropdown-item rounded-1 d-flex align-items-center gap-2" href="${relativePath}/user/${userSlug}/chats" role="menuitem">
                             <i class="far fa-fw fa-comments"></i>
-                            <span>${buttonText}</span>
+                            <span>${t('viewChats')}</span>
                         </a>
                     </li>
                     <li role="presentation" class="dropdown-divider"></li>
@@ -214,20 +234,25 @@ $(document).ready(function() {
         }
 
         const url = data && data.url ? data.url : '';
-
         if (url.match(/^user\/.+\/chats/) || url === 'chats') {
             refreshChatUi();
             setTimeout(refreshChatUi, 500);
+            setTimeout(refreshChatUi, 1200);
         }
     });
 
     $(window).on('action:chat.loaded', function() {
         refreshChatUi();
         setTimeout(refreshChatUi, 200);
+        setTimeout(refreshChatUi, 1000);
     });
 
     $(window).on('action:chat.closed', function() {
         setTimeout(refreshChatUi, 200);
+    });
+
+    $(window).on('action:chat.onMessagesAddedToDom action:chat.edited', function() {
+        setTimeout(updateLockedActionVisibility, 0);
     });
 
     $(document).on('click', '.admin-chat-lock-toggle-item', async function(ev) {
@@ -247,13 +272,17 @@ $(document).ready(function() {
             const result = await toggleRoomLock(roomId, !isLocked);
             if (ajaxify && ajaxify.data) {
                 ajaxify.data.adminChatLock = result.lockData;
+                ajaxify.data.canReply = !result.lockData.isLocked || (app.user && app.user.isAdmin);
+                ajaxify.data.showUserInput = ajaxify.data.canReply;
                 if (ajaxify.data.room) {
                     ajaxify.data.room.adminChatLock = result.lockData;
+                    ajaxify.data.room.canReply = ajaxify.data.canReply;
+                    ajaxify.data.room.showUserInput = ajaxify.data.showUserInput;
                 }
             }
             ajaxify.refresh();
         } catch (err) {
-            app.alertError(isEnglishSystem() ? 'Unable to update room lock.' : 'לא ניתן לעדכן את נעילת החדר.');
+            app.alertError(t('updateError'));
             $button.removeClass('disabled').removeAttr('aria-disabled');
         }
     });
