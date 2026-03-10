@@ -9,7 +9,6 @@ $(document).ready(function() {
             updateError: 'לא ניתן לעדכן את נעילת החדר.',
             viewChats: "צפיה בצ'אטים",
             emptyState: "אנא בחר צ'אט מסרגל הצד.",
-            lockedAction: 'לא ניתן לבצע פעולה זו בחדר נעול',
             participants: 'משתתפים',
         },
         en: {
@@ -19,7 +18,6 @@ $(document).ready(function() {
             updateError: 'Unable to update room lock.',
             viewChats: 'View Chats',
             emptyState: 'Please select a chat from the sidebar.',
-            lockedAction: 'This action cannot be performed in a locked room.',
             participants: 'Participants',
         },
     };
@@ -31,6 +29,15 @@ $(document).ready(function() {
     function t(key) {
         const dict = isEnglishSystem() ? TEXT.en : TEXT.he;
         return dict[key];
+    }
+
+    // Get lockedAction message from server translations only (based on forum settings)
+    function getLockedActionMessage() {
+        if (window.adminChatsTranslations && window.adminChatsTranslations.lockedAction) {
+            return window.adminChatsTranslations.lockedAction;
+        }
+        // If server translation not available, default to English
+        return 'This action cannot be performed in a locked room.';
     }
 
     function isAdminAllChatsPage() {
@@ -147,9 +154,6 @@ $(document).ready(function() {
                                 history.pushState({ url: url }, null, `${window.location.protocol}//${window.location.host}${config.relative_path || ''}/${url}`);
                             }
                             bindAdminRecentChatsInfiniteScroll();
-                        })
-                        .catch(function(error) {
-                            console.warn('[admin-chats] ' + error.message);
                         });
                 };
 
@@ -534,26 +538,13 @@ $(document).ready(function() {
         }
     });
 
-    if (app && app.alertError) {
-        const originalAlertError = app.alertError;
-        app.alertError = function(error) {
-            let message = error;
-            if (typeof error === 'object' && error.message) {
-                message = error.message;
-            }
-            if (typeof message === 'string' && message.includes('admin-chats:errors.lockedAction')) {
-                message = t('lockedAction');
-            }
-            return originalAlertError.call(this, message);
-        };
-    }
-
+    // Intercept and translate error messages from API - only for lockedAction
     if (app.alertError && !app.alertError._adminChatsWrapped) {
         const originalAlertError = app.alertError;
         app.alertError = function(message) {
             if (typeof message === 'string') {
                 if (message.includes('[[admin-chats:errors.lockedAction]]') || message.includes('errors.lockedAction')) {
-                    message = t('lockedAction');
+                    message = getLockedActionMessage();
                 }
             }
             return originalAlertError.call(this, message);

@@ -11,6 +11,28 @@ const helpers = require.main.require('./src/controllers/helpers');
 const plugin = {};
 const LOCK_PREFIX = '[admin-chat-lock]';
 const LOCKED_MESSAGE_TEXT = '🔒 חדר זה ננעל ע"י המנהלים.';
+
+async function getLockedActionMessage(uid) {
+    try {
+        const userData = await User.getUserData(uid);
+        let userLang = userData && userData.settings && userData.userLang;
+        
+        // If user doesn't have specific language setting, use forum default
+        if (!userLang) {
+            const meta = require.main.require('./src/meta');
+            userLang = meta.config.defaultLang || 'en-GB';
+        }
+        
+        if (userLang === 'he' || userLang === 'he-IL') {
+            return 'לא ניתן לבצע פעולה זו בחדר נעול';
+        } else {
+            return 'This action cannot be performed in a locked room.';
+        }
+    } catch (err) {
+        // Default to English if we can't determine language
+        return 'This action cannot be performed in a locked room.';
+    }
+}
 const ADMIN_CHAT_PAGE_SIZE = 30;
 const ADMIN_CHAT_SCAN_SIZE = 100;
 
@@ -19,6 +41,42 @@ plugin.init = async function (params) {
     overrideMessagingFunctions();
     overrideChatsApi();
     overrideCoreChatRedirect(params.controllers);
+};
+
+plugin.addScripts = async function (data) {
+    let isHebrew = false;
+    
+    const uid = data.req && data.req.uid;
+    if (uid) {
+        try {
+            const userData = await User.getUserData(uid);
+            let userLang = userData && userData.settings && userData.userLang;
+            
+            // If user doesn't have specific language setting, use forum default
+            if (!userLang) {
+                const meta = require.main.require('./src/meta');
+                userLang = meta.config.defaultLang || 'en-GB';
+            }
+            
+            isHebrew = userLang === 'he' || userLang === 'he-IL';
+        } catch (err) {
+            // Default to English if error
+            isHebrew = false;
+        }
+    }
+    
+    // Only send the lockedAction translation from server
+    const translations = {
+        lockedAction: isHebrew ? 'לא ניתן לבצע פעולה זו בחדר נעול' : 'This action cannot be performed in a locked room.',
+    };
+
+    data.scripts = data.scripts || [];
+    data.scripts.push({
+        src: false,
+        script: `window.adminChatsTranslations = ${JSON.stringify(translations)};`
+    });
+
+    return data;
 };
 
 plugin.addProfileLink = async function (data) {
@@ -41,7 +99,7 @@ plugin.addProfileLink = async function (data) {
             });
         }
     } catch (e) {
-        console.error('[Super Admin Chats] Error adding profile link:', e);
+        // Silent error handling
     }
     return data;
 };
@@ -92,28 +150,32 @@ plugin.filterMessagingSend = async function (payload) {
     }
 
     if (await isRoomLocked(roomId)) {
-        throw new Error('[[admin-chats:errors.lockedAction]]');
+        const message = await getLockedActionMessage(uid);
+        throw new Error(message);
     }
 
     return payload;
 };
 plugin.filterAddUsersToRoom = async function (payload) {
     if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
-        throw new Error('[[admin-chats:errors.lockedAction]]');
+        const message = await getLockedActionMessage(payload.uid);
+        throw new Error(message);
     }
     return payload;
 };
 
 plugin.filterRemoveUsersFromRoom = async function (payload) {
     if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
-        throw new Error('[[admin-chats:errors.lockedAction]]');
+        const message = await getLockedActionMessage(payload.uid);
+        throw new Error(message);
     }
     return payload;
 };
 
 plugin.filterRenameRoom = async function (payload) {
     if (await canNonAdminModifyLockedRoom(payload.uid, payload.roomId)) {
-        throw new Error('[[admin-chats:errors.lockedAction]]');
+        const message = await getLockedActionMessage(payload.uid);
+        throw new Error(message);
     }
     return payload;
 };
@@ -242,7 +304,8 @@ function overrideChatsApi() {
     const originalKick = ChatsAPI.kick;
     const wrappedKick = async function (caller, data) {
         if (caller && !await User.isAdministrator(caller.uid) && data && data.roomId && Array.isArray(data.uids) && data.uids.length === 1 && parseInt(data.uids[0], 10) === parseInt(caller.uid, 10) && await isRoomLocked(data.roomId)) {
-            throw new Error('[[admin-chats:errors.lockedAction]]');
+            const message = await getLockedActionMessage(caller.uid);
+            throw new Error(message);
         }
 
         return await originalKick.call(this, caller, data);
@@ -264,7 +327,8 @@ function overrideMessagingFunctions() {
 
         const roomId = await getMessageRoomId(messageId);
         if (roomId && await isRoomLocked(roomId)) {
-            throw new Error('[[admin-chats:errors.lockedAction]]');
+            const message = await getLockedActionMessage(uid);
+            throw new Error(message);
         }
 
         return await originalCanEdit(messageId, uid);
@@ -277,7 +341,8 @@ function overrideMessagingFunctions() {
 
         const roomId = await getMessageRoomId(messageId);
         if (roomId && await isRoomLocked(roomId)) {
-            throw new Error('[[admin-chats:errors.lockedAction]]');
+            const message = await getLockedActionMessage(uid);
+            throw new Error(message);
         }
 
         return await originalCanDelete(messageId, uid);
@@ -347,7 +412,6 @@ function registerRoutes(app, router, middleware) {
             const data = await getAdminRecentChats(req.uid, start, ADMIN_CHAT_PAGE_SIZE);
             res.json(data);
         } catch (err) {
-            console.error('[Super Admin Chats] Error loading admin chat list:', err);
             res.status(500).json({ status: { code: 'error', message: err.message } });
         }
     });
@@ -361,7 +425,6 @@ function registerRoutes(app, router, middleware) {
             const payload = await buildAdminChatsPayload(req);
             res.json(payload);
         } catch (err) {
-            console.error('[Super Admin Chats] Error loading admin chat page data:', err);
             res.status(500).json({ status: { code: 'error', message: err.message } });
         }
     });
@@ -394,7 +457,6 @@ function registerRoutes(app, router, middleware) {
                 lockData,
             });
         } catch (err) {
-            console.error('[Super Admin Chats] Error updating room lock:', err);
             return res.status(500).json({ status: { code: 'error', message: err.message } });
         }
     });

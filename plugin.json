@@ -59,6 +59,10 @@
     {
       "hook": "filter:chat.renameRoom",
       "method": "filterRenameRoom"
+    },
+    {
+      "hook": "filter:scripts.get",
+      "method": "addScripts"
     }
   ]
 }
