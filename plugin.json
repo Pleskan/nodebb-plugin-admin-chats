@@ -71,9 +71,11 @@
     {
       "hook": "filter:user.notifications.getNotifications",
       "method": "filterUserNotificationsGetNotifications"
+    },
+    {
+      "hook": "static:privileges.global.init",
+      "method": "registerPrivileges"
     }
-  ]
+  ],
+  "languages": "public/languages"
 }
-
-
-
