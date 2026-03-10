@@ -10,6 +10,7 @@ $(document).ready(function() {
             viewChats: "צפיה בצ'אטים",
             emptyState: "אנא בחר צ'אט מסרגל הצד.",
             lockedAction: 'לא ניתן לבצע פעולה זו בחדר נעול',
+            participants: 'משתתפים',
         },
         en: {
             lockBanner: '🔒 This room was locked by the administrators.',
@@ -19,6 +20,7 @@ $(document).ready(function() {
             viewChats: 'View Chats',
             emptyState: 'Please select a chat from the sidebar.',
             lockedAction: 'This action cannot be performed in a locked room.',
+            participants: 'Participants',
         },
     };
 
@@ -374,6 +376,33 @@ $(document).ready(function() {
     }
 
 
+    function getAdminRoomsMap() {
+        const rooms = ajaxify && ajaxify.data && Array.isArray(ajaxify.data.rooms) ? ajaxify.data.rooms : [];
+        return new Map(rooms.map(room => [String(room.roomId), room]));
+    }
+
+    function renderAdminParticipants() {
+        if (!isAdminAllChatsPage()) {
+            return;
+        }
+
+        const roomsMap = getAdminRoomsMap();
+        $('[component="chat/recent/room"]').each(function() {
+            const $room = $(this);
+            const roomId = String($room.attr('data-roomid') || '');
+            const roomData = roomsMap.get(roomId);
+            const $container = $room.find('[component="chat/room/title"]').closest('.d-flex.flex-grow-1.flex-column.w-100');
+
+            $container.find('.admin-chat-participants').remove();
+            if (!$container.length || !roomData || !roomData.participantsLabel) {
+                return;
+            }
+
+            const html = `<div class="admin-chat-participants text-muted text-xs text-break line-clamp-2"><span class="fw-semibold">${t('participants')}:</span> ${utils.escapeHTML(roomData.participantsLabel)}</div>`;
+            $container.find('[component="chat/room/title"]').after(html);
+        });
+    }
+
     function applyAdminAllPageTweaks() {
         if (!isAdminAllChatsPage()) {
             return;
@@ -381,6 +410,7 @@ $(document).ready(function() {
 
         $('[component="chat/recent"] .mark-read').addClass('hidden');
         $('[data-action="leave"]').closest('li').addClass('hidden');
+        renderAdminParticipants();
     }
     async function refreshChatUi() {
         replaceAdminEmptyStateText();

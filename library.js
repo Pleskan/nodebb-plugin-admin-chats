@@ -546,7 +546,7 @@ async function enrichAdminRecentRooms(uid, roomIds, rooms) {
         return;
     }
 
-    const roomUsers = await Promise.all(roomIds.map(roomId => Messaging.getUidsInRoom(roomId, 0, 9)));
+    const roomUsers = await Promise.all(roomIds.map(roomId => Messaging.getUidsInRoom(roomId, 0, -1)));
     const uniqueUids = [...new Set(roomUsers.flat().filter(Boolean))];
     const userMap = new Map();
 
@@ -578,8 +578,23 @@ async function enrichAdminRecentRooms(uid, roomIds, rooms) {
         room.teaser = teasers[index];
         room.lastUser = room.users[0];
         room.usernames = Messaging.generateUsernames(room, uid);
+        room.participantsLabel = buildParticipantsLabel(room.users);
         room.icon = Messaging.getRoomIcon(room);
     });
+}
+
+function buildParticipantsLabel(users) {
+    const list = Array.isArray(users) ? users.filter(Boolean) : [];
+    if (!list.length) {
+        return '';
+    }
+
+    const names = list.map(user => user.displayname || user.username).filter(Boolean);
+    if (names.length <= 5) {
+        return names.join(', ');
+    }
+
+    return `${names.slice(0, 5).join(', ')} +${names.length - 5}`;
 }
 
 async function getAdminRoomTeaser(roomId) {
