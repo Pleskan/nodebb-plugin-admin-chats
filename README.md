@@ -47,6 +47,14 @@ The plugin overrides core messaging functions to ensure full administrative cont
 
 ## Installation
 
+### Option 1: Via Admin Control Panel (Recommended)
+1. Navigate to the NodeBB Admin Control Panel (ACP).
+2. Go to **Extend** → **Plugins**.
+3. Search for "nodebb-plugin-admin-chats".
+4. Click **Install**.
+5. Activate the plugin and restart NodeBB.
+
+### Option 2: Via Terminal
 1. Install the plugin via terminal:
    ```bash
    npm install nodebb-plugin-admin-chats
