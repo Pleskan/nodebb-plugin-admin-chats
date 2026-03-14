@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Ce salon a été verrouillé par les administrateurs.",
+  "menu.lock": "Verrouiller le salon",
+  "menu.release": "Déverrouiller le salon",
+  "errors.update": "Impossible de mettre à jour le verrouillage du salon.",
+  "profile.viewChats": "Voir les Chats",
+  "empty.selectChat": "Veuillez sélectionner un Chat dans la barre latérale.",
+  "errors.lockedAction": "Cette action ne peut pas être effectuée dans un salon verrouillé.",
+  "admin-chats-view": "Voir tous les Chats",
+  "admin-chats-manage": "Gérer les salons de discussion",
+  "participants": "Participants"
+}

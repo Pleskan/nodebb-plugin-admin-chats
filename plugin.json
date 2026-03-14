@@ -61,8 +61,8 @@
       "method": "filterRenameRoom"
     },
     {
-      "hook": "filter:scripts.get",
-      "method": "addScripts"
+      "hook": "filter:middleware.render",
+      "method": "addTemplateData"
     },
     {
       "hook": "filter:notifications.create",
@@ -79,3 +79,6 @@
   ],
   "languages": "public/languages"
 }
+
+
+

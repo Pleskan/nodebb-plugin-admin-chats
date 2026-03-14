@@ -7,5 +7,6 @@
   "empty.selectChat": "אנא בחר צ'אט מסרגל הצד.",
   "errors.lockedAction": "לא ניתן לבצע פעולה זו בחדר נעול",
   "admin-chats-view": "צפיה בכל הצ'אטים",
-  "admin-chats-manage": "ניהול חדרי צ'אט"
+  "admin-chats-manage": "ניהול חדרי צ'אט",
+  "participants": "משתתפים"
 }

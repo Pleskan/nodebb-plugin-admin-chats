@@ -1,35 +1,45 @@
 $(document).ready(function() {
+    console.log(`[admin-chats] Client script loaded`);
+    
+    // Initialize translations object if not already set
+    if (!window.adminChatsTranslations) {
+        window.adminChatsTranslations = {};
+    }
+    
+    console.log(`[admin-chats] ajaxify.data:`, ajaxify.data);
+    console.log(`[admin-chats] window.adminChatsTranslations:`, window.adminChatsTranslations);
+    console.log(`[admin-chats] window.adminChatsLanguage:`, window.adminChatsLanguage);
+    
+    // Get translations from ajaxify.data if available
+    if (ajaxify.data && ajaxify.data.adminChatsTranslations) {
+        window.adminChatsTranslations = ajaxify.data.adminChatsTranslations;
+        window.adminChatsLanguage = ajaxify.data.adminChatsLanguage;
+        window.adminChatsAccess = ajaxify.data.adminChatsAccess;
+        window.adminChatsIsAdmin = ajaxify.data.adminChatsIsAdmin;
+        window.adminChatsCanManage = ajaxify.data.adminChatsCanManage;
+        console.log(`[admin-chats] Loaded translations from ajaxify.data`);
+    }
+    
     syncAdminAccessFromAjaxify();
     fetchAdminPrivileges();
     const LOCK_PREFIX = '[admin-chat-lock]';
     const roomStateCache = new Map();
-    const TEXT = {
-        he: {
-            lockBanner: '🔒 חדר זה ננעל ע"י המנהלים.',
-            menuLock: 'נעל חדר',
-            menuRelease: 'שחרר נעילה',
-            updateError: 'לא ניתן לעדכן את נעילת החדר.',
-            viewChats: "צפיה בצ'אטים",
-            emptyState: "אנא בחר צ'אט מסרגל הצד.",
-            participants: 'משתתפים',
-        },
-        en: {
-            lockBanner: '🔒 This room was locked by the administrators.',
-            menuLock: 'Lock Room',
-            menuRelease: 'Release Lock',
-            updateError: 'Unable to update room lock.',
-            viewChats: 'View Chats',
-            emptyState: 'Please select a chat from the sidebar.',
-            participants: 'Participants',
-        },
-    };
 
-    function isEnglishSystem() {
-        return $('html').attr('lang') && $('html').attr('lang').startsWith('en');
-    }
     function t(key) {
-        const dict = isEnglishSystem() ? TEXT.en : TEXT.he;
-        return dict[key];
+        // Get translation from server (from language files)
+        if (window.adminChatsTranslations && window.adminChatsTranslations[key]) {
+            return window.adminChatsTranslations[key];
+        }
+        // If translation not found, log warning and return the key itself
+        console.warn(`[admin-chats] Translation not found for key: ${key}`);
+        console.log(`[admin-chats] Available translations:`, window.adminChatsTranslations);
+        return key;
+    }
+    
+    function isEnglishSystem() {
+        const lang = window.adminChatsLanguage || $('html').attr('lang') || 'en';
+        const langCode = lang.split('-')[0];
+        return langCode === 'en';
     }
 
     function hasAdminChatsAccess() {
@@ -129,8 +139,8 @@ $(document).ready(function() {
 
     // Get lockedAction message from server translations only (based on forum settings)
     function getLockedActionMessage() {
-        if (window.adminChatsTranslations && window.adminChatsTranslations.lockedAction) {
-            return window.adminChatsTranslations.lockedAction;
+        if (window.adminChatsTranslations && window.adminChatsTranslations['errors.lockedAction']) {
+            return window.adminChatsTranslations['errors.lockedAction'];
         }
         // If server translation not available, default to English
         return 'This action cannot be performed in a locked room.';
@@ -281,7 +291,7 @@ $(document).ready(function() {
                 currentText.includes('You have no active chats') ||
                 currentText === 'You have no active chats.'
             ) {
-                $(this).text(t('emptyState'));
+                $(this).text(t('empty.selectChat'));
                 $(this).removeClass('text-muted');
             }
         });
@@ -416,7 +426,7 @@ $(document).ready(function() {
         }
 
         const positionStyle = isEnglishSystem() ? 'float:right; clear:both;' : 'float:left; clear:both;';
-        target.prepend(`<div class="admin-chat-lock-banner alert alert-warning mb-2 text-start" style="${positionStyle} max-width: fit-content;">${t('lockBanner')}</div>`);
+        target.prepend(`<div class="admin-chat-lock-banner alert alert-warning mb-2 text-start" style="${positionStyle} max-width: fit-content;">${t('lock.banner')}</div>`);
     }
 
     function updateLockedActionVisibility($window, hidden) {
@@ -457,7 +467,7 @@ $(document).ready(function() {
             if (!text.includes(LOCK_PREFIX.slice(1, -1)) && !text.includes('admin-chat-lock')) {
                 return;
             }
-            $el.text(t('lockBanner'));
+            $el.text(t('lock.banner'));
         });
     }
 
@@ -483,7 +493,7 @@ $(document).ready(function() {
 
         const lockData = roomData.adminChatLock || {};
         const isLocked = !!lockData.isLocked;
-        const itemText = isLocked ? t('menuRelease') : t('menuLock');
+        const itemText = isLocked ? t('menu.release') : t('menu.lock');
         const iconClass = isLocked ? 'fa-lock-open' : 'fa-lock';
         const menuItemHtml = `
             <li role="presentation" class="admin-chat-lock-item-wrap">
@@ -609,7 +619,7 @@ $(document).ready(function() {
             <li role="presentation" class="admin-chats-profile-link">
                 <a class="dropdown-item rounded-1 d-flex align-items-center gap-2" href="${relativePath}/user/${userSlug}/chats" role="menuitem">
                     <i class="far fa-fw fa-comments"></i>
-                    <span>${t("viewChats")}</span>
+                    <span>${t("profile.viewChats")}</span>
                 </a>
             </li>
         `;
@@ -804,7 +814,7 @@ $(document).ready(function() {
             setCachedRoomData(roomId, cached);
             await refreshChatUi();
         } catch (err) {
-            app.alertError(t('updateError'));
+            app.alertError(t('errors.update'));
             $button.removeClass('disabled').removeAttr('aria-disabled');
         }
     });
@@ -823,3 +833,4 @@ $(document).ready(function() {
         app.alertError._adminChatsWrapped = true;
     }
 });
+

@@ -7,12 +7,85 @@ const db = require.main.require('./src/database');
 const meta = require.main.require('./src/meta');
 const privileges = require.main.require('./src/privileges');
 const helpers = require.main.require('./src/controllers/helpers');
+const fs = require('fs');
+const path = require('path');
 
 const plugin = {};
 const LOCK_PREFIX = '[admin-chat-lock]';
-const LOCKED_MESSAGE_TEXT = '🔒 חדר זה ננעל ע"י המנהלים.';
+const LOCKED_MESSAGE_TEXT_KEY = 'lock.banner';
 const ADMIN_CHATS_PRIVILEGE = 'admin-chats:view';
 const ADMIN_CHATS_MANAGE_PRIVILEGE = 'admin-chats:manage';
+
+// Load translations from language files
+const translations = {};
+function loadTranslations() {
+    // Try multiple possible paths
+    const possiblePaths = [
+        path.join(__dirname, 'public', 'languages'),
+        path.join(__dirname, '..', '..', 'public', 'languages'),
+        path.resolve(__dirname, 'public', 'languages'),
+    ];
+    
+    let languagesDir = null;
+    for (const dir of possiblePaths) {
+        if (fs.existsSync(dir)) {
+            languagesDir = dir;
+            console.log(`[admin-chats] Found languages directory at: ${languagesDir}`);
+            break;
+        }
+    }
+    
+    if (!languagesDir) {
+        console.warn(`[admin-chats] Languages directory not found in any of these paths:`, possiblePaths);
+        return;
+    }
+    
+    try {
+        const langs = fs.readdirSync(languagesDir);
+        langs.forEach(lang => {
+            const langPath = path.join(languagesDir, lang, 'admin-chats.json');
+            try {
+                if (fs.existsSync(langPath)) {
+                    const content = fs.readFileSync(langPath, 'utf8');
+                    translations[lang] = JSON.parse(content);
+                    console.log(`[admin-chats] Loaded translations for language: ${lang}`);
+                }
+            } catch (err) {
+                console.error(`[admin-chats] Error loading translations for ${lang}:`, err.message);
+            }
+        });
+    } catch (err) {
+        console.error(`[admin-chats] Error reading languages directory:`, err.message);
+    }
+}
+loadTranslations();
+function getTranslationForLang(lang, key) {
+    if (!key) {
+        return '';
+    }
+    if (lang && translations[lang] && translations[lang][key]) {
+        return translations[lang][key];
+    }
+    const langCode = lang ? lang.split('-')[0] : '';
+    if (langCode && translations[langCode] && translations[langCode][key]) {
+        return translations[langCode][key];
+    }
+    if (translations.en && translations.en[key]) {
+        return translations.en[key];
+    }
+    if (translations['en-GB'] && translations['en-GB'][key]) {
+        return translations['en-GB'][key];
+    }
+    return '';
+}
+
+function getDefaultLockMessage() {
+    const defaultLang = meta.config.defaultLang || 'en-GB';
+    return getTranslationForLang(defaultLang, LOCKED_MESSAGE_TEXT_KEY)
+        || getTranslationForLang('en-GB', LOCKED_MESSAGE_TEXT_KEY)
+        || getTranslationForLang('en', LOCKED_MESSAGE_TEXT_KEY)
+        || 'This room was locked by the administrators.';
+}
 
 async function getLockedActionMessage(uid) {
     try {
@@ -21,15 +94,22 @@ async function getLockedActionMessage(uid) {
         
         // If user doesn't have specific language setting, use forum default
         if (!userLang) {
-            const meta = require.main.require('./src/meta');
             userLang = meta.config.defaultLang || 'en-GB';
         }
         
-        if (userLang === 'he' || userLang === 'he-IL') {
-            return 'לא ניתן לבצע פעולה זו בחדר נעול';
-        } else {
-            return 'This action cannot be performed in a locked room.';
+        // Extract language code (e.g., 'he' from 'he-IL', 'fr' from 'fr-FR')
+        const langCode = userLang.split('-')[0];
+        
+        // Try to get translation from loaded files
+        if (translations[langCode] && translations[langCode]['errors.lockedAction']) {
+            return translations[langCode]['errors.lockedAction'];
         }
+        if (translations[userLang] && translations[userLang]['errors.lockedAction']) {
+            return translations[userLang]['errors.lockedAction'];
+        }
+        
+        // Fallback to English only
+        return 'This action cannot be performed in a locked room.';
     } catch (err) {
         // Default to English if we can't determine language
         return 'This action cannot be performed in a locked room.';
@@ -77,6 +157,13 @@ plugin.init = async function (params) {
     overrideMessagingFunctions();
     overrideChatsApi();
     overrideCoreChatRedirect(params.controllers);
+    
+    // Add middleware to inject translations into every page
+    params.app.use((req, res, next) => {
+        // Store translations in res.locals so they can be accessed in templates
+        res.locals.adminChatsTranslations = translations;
+        next();
+    });
 };
 plugin.registerPrivileges = async function (data) {
     if (!data || !data.privileges || typeof data.privileges.set !== 'function') {
@@ -153,42 +240,125 @@ plugin.filterUserNotificationsGetNotifications = async function (data) {
 
     return data;
 };
-plugin.addScripts = async function (data) {
-    let isHebrew = false;
-    
-    const uid = data.req && data.req.uid;
+async function buildAdminChatsClientContext(req) {
+    console.log(`[admin-chats] addScripts hook called`);
+    const uid = req && req.uid;
+    console.log(`[admin-chats] addScripts called with uid: ${uid}`);
+
+    let userLang = 'en-GB';
+
     if (uid) {
         try {
             const userData = await User.getUserData(uid);
-            let userLang = userData && userData.settings && userData.userLang;
-            
+            console.log(`[admin-chats] Full userData:`, userData);
+            console.log(`[admin-chats] User data for uid ${uid}:`, {
+                userLang: userData && userData.userLang,
+                settingsUserLang: userData && userData.settings && userData.settings.userLang,
+            });
+
+            // Try different ways to get user language
+            userLang = userData && userData.userLang;
+            if (!userLang && userData && userData.settings) {
+                userLang = userData.settings.userLang;
+            }
+
             // If user doesn't have specific language setting, use forum default
             if (!userLang) {
-                const meta = require.main.require('./src/meta');
                 userLang = meta.config.defaultLang || 'en-GB';
+                console.log(`[admin-chats] Using forum default language: ${userLang}`);
             }
-            
-            isHebrew = userLang === 'he' || userLang === 'he-IL';
         } catch (err) {
-            // Default to English if error
-            isHebrew = false;
+            console.error(`[admin-chats] Error getting user language:`, err.message);
+            userLang = meta.config.defaultLang || 'en-GB';
         }
+    } else {
+        // No uid, use forum default language
+        userLang = meta.config.defaultLang || 'en-GB';
+        console.log(`[admin-chats] No uid, using forum default language: ${userLang}`);
     }
-    
-    // Only send the lockedAction translation from server
-    const translations = {
-        lockedAction: isHebrew ? 'לא ניתן לבצע פעולה זו בחדר נעול' : 'This action cannot be performed in a locked room.',
-    };
+
+    // Build translations based on user language from loaded files
+    let clientTranslations = {};
+    const langCode = userLang.split('-')[0];
+
+    console.log(`[admin-chats] Forum default language: ${meta.config.defaultLang}`);
+    console.log(`[admin-chats] User language: ${userLang}, Language code: ${langCode}`);
+    console.log(`[admin-chats] Available translations:`, Object.keys(translations));
+
+    // Try to get translations from loaded files
+    // First try exact match (e.g., 'he-IL')
+    if (translations[userLang]) {
+        clientTranslations = translations[userLang];
+        console.log(`[admin-chats] Using exact match: ${userLang}`);
+    }
+    // Then try language code (e.g., 'he' from 'he-IL')
+    else if (translations[langCode]) {
+        clientTranslations = translations[langCode];
+        console.log(`[admin-chats] Using language code: ${langCode}`);
+    }
+    // Then try full locale (e.g., 'en-GB')
+    else if (translations[userLang.replace('-', '-')]) {
+        clientTranslations = translations[userLang];
+        console.log(`[admin-chats] Using full locale: ${userLang}`);
+    }
+    // Fallback to English
+    else {
+        clientTranslations = translations['en'] || translations['en-GB'] || {};
+        console.log(`[admin-chats] Using fallback (en or en-GB)`);
+    }
+
+    console.log(`[admin-chats] Sending translations:`, Object.keys(clientTranslations));
+    console.log(`[admin-chats] clientTranslations content:`, clientTranslations);
 
     const isAdmin = uid ? await User.isAdministrator(uid) : false;
     const adminChatsManage = uid ? (isAdmin || await privileges.global.can(ADMIN_CHATS_MANAGE_PRIVILEGE, uid)) : false;
     const adminChatsAccess = uid ? (isAdmin || adminChatsManage || await privileges.global.can(ADMIN_CHATS_PRIVILEGE, uid)) : false;
 
+    return {
+        clientTranslations,
+        userLang,
+        adminChatsAccess,
+        adminChatsIsAdmin: isAdmin,
+        adminChatsCanManage: adminChatsManage,
+    };
+}
+
+plugin.addTemplateData = async function (data) {
+    const templateData = data && data.templateData ? data.templateData : null;
+    if (!templateData) {
+        return data;
+    }
+
+    const context = await buildAdminChatsClientContext(data.req);
+    templateData.adminChatsTranslations = context.clientTranslations;
+    templateData.adminChatsLanguage = context.userLang;
+    templateData.adminChatsAccess = context.adminChatsAccess;
+    templateData.adminChatsIsAdmin = context.adminChatsIsAdmin;
+    templateData.adminChatsCanManage = context.adminChatsCanManage;
+
+    console.log(`[admin-chats] Added translations to template data`);
+    return data;
+};
+
+plugin.addScripts = async function (data) {
+    const context = await buildAdminChatsClientContext(data.req);
+
+    // Add translations directly to data object
+    data.adminChatsTranslations = context.clientTranslations;
+    data.adminChatsLanguage = context.userLang;
+    data.adminChatsAccess = context.adminChatsAccess;
+    data.adminChatsIsAdmin = context.adminChatsIsAdmin;
+    data.adminChatsCanManage = context.adminChatsCanManage;
+
+    // Also add as inline script to ensure it's available before client.js runs
     data.scripts = data.scripts || [];
+    const scriptContent = `window.adminChatsTranslations = ${JSON.stringify(context.clientTranslations)}; window.adminChatsLanguage = '${context.userLang}'; window.adminChatsAccess = ${context.adminChatsAccess}; window.adminChatsIsAdmin = ${context.adminChatsIsAdmin}; window.adminChatsCanManage = ${context.adminChatsCanManage};`;
     data.scripts.push({
         src: false,
-        script: `window.adminChatsTranslations = ${JSON.stringify(translations)}; window.adminChatsAccess = ${adminChatsAccess}; window.adminChatsIsAdmin = ${isAdmin}; window.adminChatsCanManage = ${adminChatsManage};`
+        script: scriptContent
     });
+
+    console.log(`[admin-chats] Added translations to data object and scripts`);
 
     return data;
 };
@@ -1003,7 +1173,7 @@ function buildRoomMessagesWithLockNotice(messages, lockData) {
     }
 
     cleanedMessages.push({
-        content: `${LOCK_PREFIX} ${LOCKED_MESSAGE_TEXT}`,
+        content: `${LOCK_PREFIX} ${getDefaultLockMessage()}`,
         fromuid: lockData.lockedBy,
         uid: lockData.lockedBy,
         timestamp: lockData.lockedAt,
@@ -1029,7 +1199,7 @@ function stripAdminLockMessages(messages) {
 function isAdminLockMessage(msg) {
     const content = String(msg && msg.content || '');
     return content.includes('admin-chat-lock') ||
-        content.includes(LOCKED_MESSAGE_TEXT) ||
+        content.includes(getDefaultLockMessage()) ||
         content.includes('נפתח מחדש ע"י המנהלים') ||
         content.includes('modules:chat.system.[admin-chat-lock]');
 }
@@ -1070,3 +1240,11 @@ function getRoomId(payload) {
 }
 
 module.exports = plugin;
+
+
+
+
+
+
+
+
