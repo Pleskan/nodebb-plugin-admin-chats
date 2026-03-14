@@ -1,14 +1,10 @@
 $(document).ready(function() {
-    console.log(`[admin-chats] Client script loaded`);
     
     // Initialize translations object if not already set
     if (!window.adminChatsTranslations) {
         window.adminChatsTranslations = {};
     }
     
-    console.log(`[admin-chats] ajaxify.data:`, ajaxify.data);
-    console.log(`[admin-chats] window.adminChatsTranslations:`, window.adminChatsTranslations);
-    console.log(`[admin-chats] window.adminChatsLanguage:`, window.adminChatsLanguage);
     
     // Get translations from ajaxify.data if available
     if (ajaxify.data && ajaxify.data.adminChatsTranslations) {
@@ -17,7 +13,6 @@ $(document).ready(function() {
         window.adminChatsAccess = ajaxify.data.adminChatsAccess;
         window.adminChatsIsAdmin = ajaxify.data.adminChatsIsAdmin;
         window.adminChatsCanManage = ajaxify.data.adminChatsCanManage;
-        console.log(`[admin-chats] Loaded translations from ajaxify.data`);
     }
     
     syncAdminAccessFromAjaxify();
@@ -31,8 +26,6 @@ $(document).ready(function() {
             return window.adminChatsTranslations[key];
         }
         // If translation not found, log warning and return the key itself
-        console.warn(`[admin-chats] Translation not found for key: ${key}`);
-        console.log(`[admin-chats] Available translations:`, window.adminChatsTranslations);
         return key;
     }
     
@@ -298,7 +291,18 @@ $(document).ready(function() {
     }
 
     function getChatWindows() {
-        return $('[component="chat/message/window"]');
+        const windows = new Set($('[component="chat/message/window"]').toArray());
+        $('.chat-modal').each(function() {
+            const $modal = $(this);
+            const nested = $modal.find('[component="chat/message/window"]').toArray();
+            if (nested.length) {
+                nested.forEach(el => windows.delete(el));
+                windows.add(this);
+            } else {
+                windows.add(this);
+            }
+        });
+        return $(Array.from(windows));
     }
 
     function getWindowRoomId($window) {

@@ -30,13 +30,11 @@ function loadTranslations() {
     for (const dir of possiblePaths) {
         if (fs.existsSync(dir)) {
             languagesDir = dir;
-            console.log(`[admin-chats] Found languages directory at: ${languagesDir}`);
             break;
         }
     }
     
     if (!languagesDir) {
-        console.warn(`[admin-chats] Languages directory not found in any of these paths:`, possiblePaths);
         return;
     }
     
@@ -48,7 +46,6 @@ function loadTranslations() {
                 if (fs.existsSync(langPath)) {
                     const content = fs.readFileSync(langPath, 'utf8');
                     translations[lang] = JSON.parse(content);
-                    console.log(`[admin-chats] Loaded translations for language: ${lang}`);
                 }
             } catch (err) {
                 console.error(`[admin-chats] Error loading translations for ${lang}:`, err.message);
@@ -241,20 +238,13 @@ plugin.filterUserNotificationsGetNotifications = async function (data) {
     return data;
 };
 async function buildAdminChatsClientContext(req) {
-    console.log(`[admin-chats] addScripts hook called`);
     const uid = req && req.uid;
-    console.log(`[admin-chats] addScripts called with uid: ${uid}`);
 
     let userLang = 'en-GB';
 
     if (uid) {
         try {
             const userData = await User.getUserData(uid);
-            console.log(`[admin-chats] Full userData:`, userData);
-            console.log(`[admin-chats] User data for uid ${uid}:`, {
-                userLang: userData && userData.userLang,
-                settingsUserLang: userData && userData.settings && userData.settings.userLang,
-            });
 
             // Try different ways to get user language
             userLang = userData && userData.userLang;
@@ -265,7 +255,6 @@ async function buildAdminChatsClientContext(req) {
             // If user doesn't have specific language setting, use forum default
             if (!userLang) {
                 userLang = meta.config.defaultLang || 'en-GB';
-                console.log(`[admin-chats] Using forum default language: ${userLang}`);
             }
         } catch (err) {
             console.error(`[admin-chats] Error getting user language:`, err.message);
@@ -274,41 +263,31 @@ async function buildAdminChatsClientContext(req) {
     } else {
         // No uid, use forum default language
         userLang = meta.config.defaultLang || 'en-GB';
-        console.log(`[admin-chats] No uid, using forum default language: ${userLang}`);
     }
 
     // Build translations based on user language from loaded files
     let clientTranslations = {};
     const langCode = userLang.split('-')[0];
 
-    console.log(`[admin-chats] Forum default language: ${meta.config.defaultLang}`);
-    console.log(`[admin-chats] User language: ${userLang}, Language code: ${langCode}`);
-    console.log(`[admin-chats] Available translations:`, Object.keys(translations));
 
     // Try to get translations from loaded files
     // First try exact match (e.g., 'he-IL')
     if (translations[userLang]) {
         clientTranslations = translations[userLang];
-        console.log(`[admin-chats] Using exact match: ${userLang}`);
     }
     // Then try language code (e.g., 'he' from 'he-IL')
     else if (translations[langCode]) {
         clientTranslations = translations[langCode];
-        console.log(`[admin-chats] Using language code: ${langCode}`);
     }
     // Then try full locale (e.g., 'en-GB')
     else if (translations[userLang.replace('-', '-')]) {
         clientTranslations = translations[userLang];
-        console.log(`[admin-chats] Using full locale: ${userLang}`);
     }
     // Fallback to English
     else {
         clientTranslations = translations['en'] || translations['en-GB'] || {};
-        console.log(`[admin-chats] Using fallback (en or en-GB)`);
     }
 
-    console.log(`[admin-chats] Sending translations:`, Object.keys(clientTranslations));
-    console.log(`[admin-chats] clientTranslations content:`, clientTranslations);
 
     const isAdmin = uid ? await User.isAdministrator(uid) : false;
     const adminChatsManage = uid ? (isAdmin || await privileges.global.can(ADMIN_CHATS_MANAGE_PRIVILEGE, uid)) : false;
@@ -336,7 +315,6 @@ plugin.addTemplateData = async function (data) {
     templateData.adminChatsIsAdmin = context.adminChatsIsAdmin;
     templateData.adminChatsCanManage = context.adminChatsCanManage;
 
-    console.log(`[admin-chats] Added translations to template data`);
     return data;
 };
 
@@ -358,7 +336,6 @@ plugin.addScripts = async function (data) {
         script: scriptContent
     });
 
-    console.log(`[admin-chats] Added translations to data object and scripts`);
 
     return data;
 };
@@ -1240,6 +1217,7 @@ function getRoomId(payload) {
 }
 
 module.exports = plugin;
+
 
 
 
