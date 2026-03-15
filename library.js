@@ -830,6 +830,29 @@ function registerRoutes(app, router, middleware) {
             return res.status(500).json({ status: { code: 'error', message: err.message } });
         }
     });
+
+    router.get('/api/admin-chats/:roomId/lock', ...routeMiddleware, async (req, res) => {
+        try {
+            const roomId = parseInt(req.params.roomId, 10);
+
+            if (Number.isNaN(roomId)) {
+                return res.status(400).json({ status: { code: 'bad-request', message: 'Invalid room id' } });
+            }
+
+            if (!await roomExists(roomId)) {
+                return res.status(404).json({ status: { code: 'not-found', message: 'Room not found' } });
+            }
+
+            const lockData = await getRoomLockData(roomId);
+            return res.json({
+                status: { code: 'ok', message: 'Lock data retrieved' },
+                roomId,
+                lockData,
+            });
+        } catch (err) {
+            return res.status(500).json({ status: { code: 'error', message: err.message } });
+        }
+    });
 }
 
 async function renderAdminChatsPage(req, res, next) {

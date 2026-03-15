@@ -336,68 +336,69 @@ $(document).ready(function() {
             return null;
         }
 
+        // First, check if we have the room data in ajaxify.data (from the current page)
         const currentRoom = ajaxify && ajaxify.data && (ajaxify.data.room || ajaxify.data);
-        if (currentRoom && parseInt(currentRoom.roomId, 10) === roomId && currentRoom.adminChatLock) {
-            setCachedRoomData(roomId, currentRoom);
-            return currentRoom;
+        if (currentRoom && parseInt(currentRoom.roomId, 10) === roomId) {
+            if (currentRoom.adminChatLock) {
+                setCachedRoomData(roomId, currentRoom);
+                return currentRoom;
+            }
         }
 
+        // Check cache
         const cached = getCachedRoomData(roomId);
         if (cached) {
             return cached;
         }
 
-        const endpoint = isAdminAllChatsPage() ?
-            `${config.relative_path || ''}/api/admin-chats/page/${roomId}` :
-            `${config.relative_path || ''}/api/chats/${roomId}`;
-        const response = await fetch(endpoint, {
-            headers: {
-                'x-csrf-token': config.csrf_token,
-            },
-            credentials: 'same-origin',
-        });
-        if (!response.ok) {
-            if (hasAdminChatsAccess() && !isAdminAllChatsPage()) {
-                const adminResponse = await fetch(`${config.relative_path || ''}/api/admin-chats/page/${roomId}`, {
+        // Try admin endpoint first if user has access
+        if (hasAdminChatsAccess()) {
+            const adminEndpoint = `${config.relative_path || ''}/api/admin-chats/page/${roomId}`;
+            try {
+                const adminResponse = await fetch(adminEndpoint, {
                     headers: {
                         'x-csrf-token': config.csrf_token,
                     },
                     credentials: 'same-origin',
                 });
-                if (!adminResponse.ok) {
-                    return null;
+                if (adminResponse.ok) {
+                    const adminPayload = await adminResponse.json();
+                    const adminRoom = adminPayload && adminPayload.roomId ? adminPayload : (adminPayload && adminPayload.room ? adminPayload.room : null);
+                    if (adminRoom) {
+                        setCachedRoomData(roomId, adminRoom);
+                        return adminRoom;
+                    }
                 }
-                const adminPayload = await adminResponse.json();
-                const adminRoom = adminPayload && adminPayload.roomId ? adminPayload : (adminPayload && adminPayload.room ? adminPayload.room : null);
-                if (adminRoom) {
-                    setCachedRoomData(roomId, adminRoom);
-                }
-                return adminRoom;
+            } catch (err) {
+                // Continue to fallback
             }
-            return null;
         }
 
-        const payload = await response.json();
-        const roomData = payload && payload.roomId ? payload : (payload && payload.room ? payload.room : null);
-        if (roomData && !roomData.adminChatLock && hasAdminChatsAccess() && !isAdminAllChatsPage()) {
-            const adminResponse = await fetch(`${config.relative_path || ''}/api/admin-chats/page/${roomId}`, {
+        // For all users, try to get lock data from the new endpoint
+        const lockEndpoint = `${config.relative_path || ''}/api/admin-chats/${roomId}/lock`;
+        try {
+            const lockResponse = await fetch(lockEndpoint, {
                 headers: {
                     'x-csrf-token': config.csrf_token,
                 },
                 credentials: 'same-origin',
             });
-            if (adminResponse.ok) {
-                const adminPayload = await adminResponse.json();
-                const adminRoom = adminPayload && adminPayload.roomId ? adminPayload : (adminPayload && adminPayload.room ? adminPayload.room : null);
-                if (adminRoom && adminRoom.adminChatLock) {
-                    roomData.adminChatLock = adminRoom.adminChatLock;
+            if (lockResponse.ok) {
+                const lockPayload = await lockResponse.json();
+                if (lockPayload && lockPayload.lockData) {
+                    const roomData = {
+                        roomId: roomId,
+                        adminChatLock: lockPayload.lockData,
+                    };
+                    setCachedRoomData(roomId, roomData);
+                    return roomData;
                 }
             }
+        } catch (err) {
+            // Ignore error
         }
-        if (roomData) {
-            setCachedRoomData(roomId, roomData);
-        }
-        return roomData;
+
+        return null;
     }
     function isLockedForUser(roomData) {
         return !!(roomData && roomData.adminChatLock && roomData.adminChatLock.isLocked && !canManageChats());
@@ -738,6 +739,35 @@ $(document).ready(function() {
         socket.on('event:chats.delete', function() { setTimeout(refreshChatUi, 0); });
         socket.on('event:chats.restore', function() { setTimeout(refreshChatUi, 0); });
     }
+
+    // Monitor for new chat modals/windows being added to the DOM
+    // This ensures styling is applied to floating chat windows opened from non-chat pages
+    const observer = new MutationObserver(function(mutations) {
+        let hasNewChatWindow = false;
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        const $node = $(node);
+                        if ($node.is('.chat-modal') || $node.find('.chat-modal').length) {
+                            hasNewChatWindow = true;
+                        }
+                        if ($node.is('[component="chat/message/window"]') || $node.find('[component="chat/message/window"]').length) {
+                            hasNewChatWindow = true;
+                        }
+                    }
+                });
+            }
+        });
+        if (hasNewChatWindow) {
+            setTimeout(refreshChatUi, 50);
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 
     // Handle browser back/forward navigation
     $(window).on('popstate', function() {
