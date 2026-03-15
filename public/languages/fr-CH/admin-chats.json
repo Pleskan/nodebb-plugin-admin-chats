@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Cette salle a été verrouillée par les administrateurs.",
+  "menu.lock": "Verrouiller la salle",
+  "menu.release": "Déverrouiller",
+  "errors.update": "Impossible de mettre à jour le verrouillage de la salle.",
+  "profile.viewChats": "Voir les discussions",
+  "empty.selectChat": "Veuillez sélectionner une discussion dans la barre latérale.",
+  "errors.lockedAction": "Cette action ne peut pas être effectuée dans une salle verrouillée.",
+  "admin-chats-view": "Voir toutes les discussions",
+  "admin-chats-manage": "Gérer les salons de discussion",
+  "participants": "Participants"
+}

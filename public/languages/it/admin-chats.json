@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Questa stanza è stata bloccata dagli amministratori.",
+  "menu.lock": "Blocca stanza",
+  "menu.release": "Rimuovi blocco",
+  "errors.update": "Impossibile aggiornare il blocco della stanza.",
+  "profile.viewChats": "Visualizza chat",
+  "empty.selectChat": "Seleziona una chat dalla barra laterale.",
+  "errors.lockedAction": "Questa azione non può essere eseguita in una stanza bloccata.",
+  "admin-chats-view": "Visualizza tutte le chat",
+  "admin-chats-manage": "Gestisci le stanze di chat",
+  "participants": "Partecipanti"
+}

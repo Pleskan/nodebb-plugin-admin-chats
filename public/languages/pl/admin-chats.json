@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Ten pokój został zablokowany przez administratorów.",
+  "menu.lock": "Zablokuj pokój",
+  "menu.release": "Odblokuj",
+  "errors.update": "Nie udało się zaktualizować blokady pokoju.",
+  "profile.viewChats": "Wyświetl czaty",
+  "empty.selectChat": "Wybierz czat z paska bocznego.",
+  "errors.lockedAction": "Tej czynności nie można wykonać w zablokowanym pokoju.",
+  "admin-chats-view": "Wyświetl wszystkie czaty",
+  "admin-chats-manage": "Zarządzaj pokojami czatu",
+  "participants": "Uczestnicy"
+}

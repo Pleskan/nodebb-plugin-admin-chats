@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Dieser Raum wurde von den Administratoren gesperrt.",
+  "menu.lock": "Raum sperren",
+  "menu.release": "Sperre aufheben",
+  "errors.update": "Raumsperre konnte nicht aktualisiert werden.",
+  "profile.viewChats": "Chats ansehen",
+  "empty.selectChat": "Bitte wählen Sie einen Chat in der Seitenleiste aus.",
+  "errors.lockedAction": "Diese Aktion kann in einem gesperrten Raum nicht ausgeführt werden.",
+  "admin-chats-view": "Alle Chats ansehen",
+  "admin-chats-manage": "Chat-Räume verwalten",
+  "participants": "Teilnehmer"
+}

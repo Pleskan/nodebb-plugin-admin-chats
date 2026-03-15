@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Quest locals è vegnì bloccà dals administraturs.",
+  "menu.lock": "Bloccar il local",
+  "menu.release": "Levà il bloc",
+  "errors.update": "Impussibel d'actualisar il bloc dal local.",
+  "profile.viewChats": "Veser chats",
+  "empty.selectChat": "Per plaschair tscherna in chat en la trav laterala.",
+  "errors.lockedAction": "Questa acziun na po betg vegnir fatga en in local bloccà.",
+  "admin-chats-view": "Veser tut ils chats",
+  "admin-chats-manage": "Administrar locals da chat",
+  "participants": "Participonts"
+}

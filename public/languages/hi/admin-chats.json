@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 इस कमरे को प्रशासकों द्वारा लॉक किया गया था।",
+  "menu.lock": "कमरा लॉक करें",
+  "menu.release": "लॉक हटाएं",
+  "errors.update": "कमरे का लॉक अपडेट नहीं हो सका।",
+  "profile.viewChats": "चैट देखें",
+  "empty.selectChat": "कृपया साइडबार से एक चैट चुनें।",
+  "errors.lockedAction": "लॉक किए गए कमरे में यह कार्रवाई नहीं की जा सकती।",
+  "admin-chats-view": "सभी चैट देखें",
+  "admin-chats-manage": "चैट रूम प्रबंधित करें",
+  "participants": "प्रतिभागी"
+}

@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Esta sala fue bloqueada por los administradores.",
+  "menu.lock": "Bloquear sala",
+  "menu.release": "Liberar bloqueo",
+  "errors.update": "No se pudo actualizar el bloqueo de la sala.",
+  "profile.viewChats": "Ver chats",
+  "empty.selectChat": "Seleccione un chat de la barra lateral.",
+  "errors.lockedAction": "Esta acción no se puede realizar en una sala bloqueada.",
+  "admin-chats-view": "Ver todos los chats",
+  "admin-chats-manage": "Administrar salas de chat",
+  "participants": "Participantes"
+}

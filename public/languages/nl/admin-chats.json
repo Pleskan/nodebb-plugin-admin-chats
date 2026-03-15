@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 Deze chatruimte is door de beheerders vergrendeld.",
+  "menu.lock": "Chatruimte vergrendelen",
+  "menu.release": "Vergrendeling opheffen",
+  "errors.update": "Kon de vergrendeling van de chatruimte niet bijwerken.",
+  "profile.viewChats": "Chats bekijken",
+  "empty.selectChat": "Selecteer een chat in de zijbalk.",
+  "errors.lockedAction": "Deze actie kan niet worden uitgevoerd in een vergrendelde chatruimte.",
+  "admin-chats-view": "Alle chats bekijken",
+  "admin-chats-manage": "Chatruimtes beheren",
+  "participants": "Deelnemers"
+}

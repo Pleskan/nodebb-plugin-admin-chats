@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 このルームは管理者によってロックされました。",
+  "menu.lock": "ルームをロック",
+  "menu.release": "ロック解除",
+  "errors.update": "ルームのロックを更新できませんでした。",
+  "profile.viewChats": "チャットを見る",
+  "empty.selectChat": "サイドバーからチャットを選択してください。",
+  "errors.lockedAction": "ロックされたルームではこの操作は実行できません。",
+  "admin-chats-view": "すべてのチャットを見る",
+  "admin-chats-manage": "チャットルームを管理",
+  "participants": "参加者"
+}

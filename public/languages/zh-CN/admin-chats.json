@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 此聊天室已被管理员锁定。",
+  "menu.lock": "锁定聊天室",
+  "menu.release": "解除锁定",
+  "errors.update": "无法更新聊天室锁定状态。",
+  "profile.viewChats": "查看聊天",
+  "empty.selectChat": "请从侧边栏选择一个聊天。",
+  "errors.lockedAction": "锁定的聊天室无法执行此操作。",
+  "admin-chats-view": "查看所有聊天",
+  "admin-chats-manage": "管理聊天室",
+  "participants": "参与者"
+}

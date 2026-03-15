@@ -1,0 +1,12 @@
+{
+  "lock.banner": "🔒 تم قفل هذه الغرفة من قبل المسؤولين.",
+  "menu.lock": "قفل الغرفة",
+  "menu.release": "إزالة القفل",
+  "errors.update": "تعذر تحديث قفل الغرفة.",
+  "profile.viewChats": "عرض الدردشات",
+  "empty.selectChat": "يرجى اختيار دردشة من الشريط الجانبي.",
+  "errors.lockedAction": "لا يمكن تنفيذ هذا الإجراء في غرفة مقفلة.",
+  "admin-chats-view": "عرض جميع الدردشات",
+  "admin-chats-manage": "إدارة غرف الدردشة",
+  "participants": "المشاركون"
+}
